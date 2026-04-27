@@ -39,7 +39,7 @@
       register: md_files
 
     # -------------------------
-    # CHECK PAGES
+    # CHECK EXISTING PAGES
     # -------------------------
     - name: Check if page exists
       uri:
@@ -58,9 +58,9 @@
       no_log: true
 
     # -------------------------
-    # READ FILES
+    # READ FILES THAT DO NOT EXIST
     # -------------------------
-    - name: Read README files
+    - name: Read markdown files
       slurp:
         src: "{{ item.item.path }}"
       register: readme_files
@@ -68,7 +68,7 @@
       when: item.json.size == 0
 
     # -------------------------
-    # CREATE PAGES
+    # CREATE CONFLUENCE PAGES
     # -------------------------
     - name: Create Confluence pages
       uri:
@@ -91,9 +91,12 @@
           body:
             storage:
               value: |
-                <h2>📄 {{ item.item.item.path | basename }}</h2>
-                <p><i>Denne side er lavet gennem ansible playbook read-md-conf.yml</i></p>
+                <h2 style="color:red;">⚠️ AUTO-GENERATED PAGE</h2>
+                <p><b>Denne side er genereret fra Git repository.</b></p>
+                <p>Ret ikke denne side i Confluence.</p>
+                <p>Lav ændringer i README.md i Git.</p>
                 <hr/>
+
                 <pre>{{ item.content | b64decode | replace('<','&lt;') | replace('>','&gt;') }}</pre>
               representation: "storage"
       loop: "{{ readme_files.results }}"
@@ -109,7 +112,10 @@
       loop: "{{ page_check.results }}"
       when: item.json.size > 0
 
-    - name: Cleanup
+    # -------------------------
+    # CLEANUP
+    # -------------------------
+    - name: Cleanup workspace
       file:
         path: "{{ repo_dest }}"
         state: absent
