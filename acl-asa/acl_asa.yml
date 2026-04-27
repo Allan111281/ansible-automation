@@ -1,0 +1,17 @@
+---
+- hosts: asa
+  gather_facts: false
+  connection: network_cli
+
+  collections:
+    - cisco.asa
+
+  tasks:
+    - name: Henter info om ACL
+      cisco.asa.asa_acls:
+        state: gathered
+
+      register: acl_result
+    - name: Vis alle ACL
+      debug:
+        var: acl_result.gathered
