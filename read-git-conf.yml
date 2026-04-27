@@ -1,0 +1,121 @@
+- name: Sync README.md files fra Git til Confluence
+  hosts: localhost
+  gather_facts: no
+
+  vars:
+    git_repo: "https://github.com/Allan111281/Git-Jenkins-Ansible.git"
+    repo_dest: "/tmp/repo"
+
+    confluence_base_url: "https://confluence.umit.dk"
+    parent_page_id: "231933858"
+
+  vars_prompt:
+    - name: confluence_user
+      prompt: "Confluence username"
+      private: no
+
+    - name: confluence_password
+      prompt: "Confluence password / API token"
+      private: yes
+
+  tasks:
+
+    - name: Clean workspace
+      file:
+        path: "{{ repo_dest }}"
+        state: absent
+
+    - name: Clone repo
+      git:
+        repo: "{{ git_repo }}"
+        dest: "{{ repo_dest }}"
+        version: main
+        force: yes
+
+    - name: Find all .md files
+      find:
+        paths: "{{ repo_dest }}"
+        patterns: "*.md"
+      register: md_files
+
+    # -------------------------
+    # CHECK EXISTING PAGES
+    # -------------------------
+    - name: Check if page exists
+      uri:
+        url: "{{ confluence_base_url }}/rest/api/content?title={{ item.path | basename | regex_replace('.md','') }}"
+        method: GET
+        user: "{{ confluence_user }}"
+        password: "{{ confluence_password }}"
+        force_basic_auth: yes
+        return_content: yes
+        headers:
+          Accept: "application/json"
+      register: page_check
+      loop: "{{ md_files.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      no_log: true
+
+    # -------------------------
+    # READ FILES THAT DO NOT EXIST
+    # -------------------------
+    - name: Read markdown files
+      slurp:
+        src: "{{ item.item.path }}"
+      register: readme_files
+      loop: "{{ page_check.results }}"
+      when: item.json.size == 0
+
+    # -------------------------
+    # CREATE CONFLUENCE PAGES
+    # -------------------------
+    - name: Create Confluence pages
+      uri:
+        url: "{{ confluence_base_url }}/rest/api/content"
+        method: POST
+        user: "{{ confluence_user }}"
+        password: "{{ confluence_password }}"
+        force_basic_auth: yes
+        headers:
+          Content-Type: "application/json"
+          Accept: "application/json"
+        body_format: json
+        body:
+          type: "page"
+          title: "{{ item.item.item.path | basename | regex_replace('.md','') }}"
+          ancestors:
+            - id: "{{ parent_page_id }}"
+          space:
+            key: "SASDOK"
+          body:
+            storage:
+              value: |
+                <h2 style="color:red;">⚠️ AUTO-GENERATED PAGE</h2>
+                <p><b>Denne side er genereret fra Git repository.</b></p>
+                <p>Ret ikke denne side i Confluence.</p>
+                <p>Lav ændringer i README.md i Git.</p>
+                <hr/>
+
+                <pre>{{ item.content | b64decode | replace('<','&lt;') | replace('>','&gt;') }}</pre>
+              representation: "storage"
+      loop: "{{ readme_files.results }}"
+      when: item is defined and item.content is defined
+      no_log: true
+
+    # -------------------------
+    # SKIP INFO
+    # -------------------------
+    - name: Show skipped pages
+      debug:
+        msg: "Page {{ item.item.path | basename }} already exists - skipping"
+      loop: "{{ page_check.results }}"
+      when: item.json.size > 0
+
+    # -------------------------
+    # CLEANUP
+    # -------------------------
+    - name: Cleanup workspace
+      file:
+        path: "{{ repo_dest }}"
+        state: absent
