@@ -1,4 +1,0 @@
-- name: Debug DB install
-  debug:
-    msg: "Installing DB components for {{ database }}"
-  when: database != "none"
