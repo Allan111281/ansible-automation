@@ -1,80 +1,35 @@
-# 📄 Sync README.md til Confluence
+# 🔐 Certificate Deployment via KeePassXC (Ansible)
 
-## 🔧 Formål
+## 📌 Beskrivelse
+Denne playbook automatiserer eksport og installation af SSL/PFX-certifikater fra en KeePassXC database til Windows hosts.
 
-Denne playbook henter alle `.md` filer fra et Git repository og opretter dem som sider i Confluence.
-
-Hver `.md` fil bliver:
-
-* en selvstændig side i Confluence
-* navngivet efter filen (fx `win_service.md` → **win_service**)
-* placeret under en fælles parent-side
+Certifikater importeres direkte i:
+`LocalMachine\My`
 
 ---
 
-## ⚙️ Funktion
+## ⚙️ Hvad gør playbooken?
 
-Playbooken udfører følgende:
+Playbooken udfører følgende trin:
 
-1. Kloner Git repository
-2. Finder alle `.md` filer
-3. Tjekker om siden allerede findes i Confluence
-4. Hvis siden ikke findes:
-
-   * opretter ny side
-   * indsætter indhold fra `.md`
-5. Hvis siden findes:
-
-   * springer over (ingen fejl)
-
----
-
-## ⚠️ Vigtigt (Auto-generated sider)
-
-Alle sider oprettet af denne playbook indeholder følgende besked:
-
-* Siden er **automatisk genereret fra Git**
-* Ændringer i Confluence vil kunne blive overskrevet
-* Rettelser skal foretages i **README.md i Git**
-
-👉 Confluence bruges kun til visning – ikke redigering
+1. Opretter midlertidig mappe på Windows hosts
+2. Henter alle certificate entries fra KeePassXC
+3. Udtrækker:
+   - Entry navne
+   - Passwords
+   - Attachments (.pfx / .p12)
+4. Eksporterer certifikater fra KeePassXC database
+5. Importerer certifikater til Windows Certificate Store
+6. Verificerer installation
 
 ---
 
-## 📁 Struktur
+## 📦 Krav
 
-Git:
+### Control node
+- Ansible 2.14+
+- `ansible.windows` collection
 
-```
-win_service.yml
-win_service.md
-im_kp_cert.yml
-im_kp_cert.md
-```
-
-Confluence:
-
-```
-Ansible Playbooks Readme
-├── win_service
-└── im_kp_cert
-```
-
----
-
-## 🚀 Kørsel
-
-```
-ansible-playbook read-md-conf.yml
-```
-
----
-
-## 📌 Kort sagt
-
-* Git = source of truth
-* README.md = dokumentation
-* Ansible = synkronisering
-* Confluence = præsentation
-
----
+Install:
+```bash
+ansible-galaxy collection install ansible.windows

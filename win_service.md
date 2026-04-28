@@ -1,41 +1,39 @@
 
 ---
 
-## 🔁 Service actions
-Playbooken understøtter:
+# 📄 2. `win_service.md`
 
-- ▶️ Start services
-- ⏹ Stop services
-- 🔄 Restart services
+```md
+# 🪟 Windows Service Management via Ansible
 
----
+## 📌 Beskrivelse
+Denne løsning bruges til at administrere Windows services på tværs af flere servere.
 
-# 🏗️ Architecture
-
-Playbooken er opdelt i 3 faser:
-
-### 1. Data Collection (alle hosts)
-- Henter services fra hver Windows server
-- Gemmer data pr. host i `host_services`
+Brugeren kan:
+- Se services fra alle hosts
+- Vælge services interaktivt
+- Stoppe / starte / genstarte services
 
 ---
 
-### 2. User Interaction (kun første host)
-- Bygger samlet overview
-- Viser services
-- Indsamler bruger input
+## 🏗️ Arkitektur
+
+### 1. Data Collection
+Alle Windows hosts indsamler services:
+- Filtrerer system/irrelevante services
+- Samler DisplayName
+
+### 2. User Interaction
+Brugeren vælger:
+- Services (kommasepareret)
+- Handling (stop/start/restart)
+
+### 3. Execution
+Valgte actions udføres på alle hosts
 
 ---
 
-### 3. Execution (alle hosts)
-- Udfører valgt action på valgte services
-- Bruger `win_service` modul
-
----
-
-# 📁 Inventory krav
-
-Playbooken kræver en inventory med en Windows gruppe:
+## 📁 Inventory krav
 
 ```ini
 [windows]
