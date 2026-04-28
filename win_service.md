@@ -1,12 +1,9 @@
+# 📄  win_service.md
 
----
 
-# 📄 2. `win_service.md`
-
-```md
 # 🪟 Windows Service Management via Ansible
 
-## 📌 Beskrivelse
+# 📌 Beskrivelse
 Denne løsning bruges til at administrere Windows services på tværs af flere servere.
 
 Brugeren kan:
@@ -14,28 +11,26 @@ Brugeren kan:
 - Vælge services interaktivt
 - Stoppe / starte / genstarte services
 
----
 
-## 🏗️ Arkitektur
+# 🏗️ Arkitektur
 
-### 1. Data Collection
+#  Data Collection
 Alle Windows hosts indsamler services:
 - Filtrerer system/irrelevante services
 - Samler DisplayName
 
-### 2. User Interaction
+#  User Interaction
 Brugeren vælger:
 - Services (kommasepareret)
 - Handling (stop/start/restart)
 
-### 3. Execution
+#  Execution
 Valgte actions udføres på alle hosts
 
----
 
-## 📁 Inventory krav
+#  📁 Inventory krav
 
-```ini
+
 [windows]
 server1
 server2

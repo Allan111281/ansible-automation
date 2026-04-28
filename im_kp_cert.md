@@ -1,14 +1,13 @@
 # 🔐 Certificate Deployment via KeePassXC (Ansible)
 
-## 📌 Beskrivelse
+# 📌 Beskrivelse
 Denne playbook automatiserer eksport og installation af SSL/PFX-certifikater fra en KeePassXC database til Windows hosts.
 
 Certifikater importeres direkte i:
-`LocalMachine\My`
+Local Computer\Personal\Certificates
 
----
 
-## ⚙️ Hvad gør playbooken?
+# ⚙️ Hvad gør playbooken?
 
 Playbooken udfører følgende trin:
 
@@ -22,14 +21,12 @@ Playbooken udfører følgende trin:
 5. Importerer certifikater til Windows Certificate Store
 6. Verificerer installation
 
----
 
-## 📦 Krav
+# 📦 Krav
 
-### Control node
+# Control node
 - Ansible 2.14+
-- `ansible.windows` collection
+- ansible.windows collection
 
 Install:
-```bash
 ansible-galaxy collection install ansible.windows
