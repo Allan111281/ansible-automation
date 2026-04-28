@@ -45,7 +45,7 @@ Alle sider oprettet af denne playbook indeholder følgende besked:
 
 Git:
 
-```id="g7xk21"
+```
 win_service.yml
 win_service.md
 im_kp_cert.yml
@@ -54,7 +54,7 @@ im_kp_cert.md
 
 Confluence:
 
-```id="m2z91k"
+```
 Ansible Playbooks Readme
 ├── win_service
 └── im_kp_cert
@@ -64,7 +64,7 @@ Ansible Playbooks Readme
 
 ## 🚀 Kørsel
 
-```bash id="kz92lx"
+```
 ansible-playbook read-md-conf.yml
 ```
 
