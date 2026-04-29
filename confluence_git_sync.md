@@ -1,97 +1,91 @@
-# 📚 Full Git → Confluence Sync (Create + Update)
+📌 Git → Confluence Sync (Ansible)
 
-# 📌 Beskrivelse
+Denne playbook holder Confluence automatisk synkroniseret med dokumentation fra Git.
 
-Denne playbook synkroniserer automatisk `.md` filer fra et Git repository til Confluence.
+Git er den primære kilde (source of truth), mens Confluence fungerer som et læsevenligt dokumentationslag.
 
-Formålet er at gøre Git til den centrale source of truth for dokumentation, mens Confluence bruges som læsevenlig visning for brugerne.
+⚙️ Funktion
 
-Playbooken kan både:
+Playbooken håndterer følgende automatisk:
 
-* oprette nye sider
-* opdatere eksisterende sider
+Læser alle .md filer fra Git repository
+Opretter en Confluence side pr. fil
+Opdaterer eksisterende sider hvis filen ændres
+Bruger filnavnet (uden .md) som sidens titel
+Opretter alle sider som child pages under en defineret parent page
 
-Det betyder, at ændringer i Git automatisk bliver pushed til Confluence ved næste deployment.
+Eksempel:
+win_services_control_interactive.md → win_services_control_interactive
 
-Brugere kan derfor altid stole på, at Confluence viser den nyeste version af dokumentationen.
+📍 Sideplacering i Confluence
 
-# ⚙️ Hvad gør playbooken?
+Alle sider oprettes som child pages under:
 
-Playbooken udfører følgende trin:
+https://confluence.umit.dk/spaces/SASDOK/pages/231933858/Ansible+Playbooks
 
-1. Rydder midlertidigt workspace på control node
+Placeringen styres af følgende parametre i playbooken:
 
-2. Cloner Git repository lokalt
+confluence_base_url: "https://confluence.umit.dk"
+confluence_space_key: "SASDOK"
+parent_page_id: "231933858"
 
-3. Finder alle `.md` filer i repository
+Definition:
+confluence_base_url → Confluence system URL
+confluence_space_key → Space hvor sider oprettes
+parent_page_id → parent page som alle sider bliver child pages under
 
-4. Tjekker om siden allerede findes i Confluence
+✏️ Ændring af placering
 
-5. Henter page ID og version number for eksisterende sider
+For at ændre hvor sider oprettes i Confluence:
 
-6. Læser indholdet af markdown-filerne
+1. Gå til projektet
 
-7. Opretter nye sider med POST hvis siden ikke findes
+cd ansible-automation
 
-8. Opdaterer eksisterende sider med PUT hvis siden allerede findes
+2. Åbn playbook
 
-9. Tilføjer informationsbanner i toppen af siden
+sudo nano confluence_git_sync.yml
 
-10. Rydder op efter execution
+3. Ret følgende værdier
+confluence_space_key
+parent_page_id
 
-# 🔁 Create + Update logik
+🔎 Find ny parent page
 
-Hvis siden ikke findes:
+Åbn ønsket side i Confluence:
 
-→ siden oprettes automatisk
+https://confluence.umit.dk/spaces/SASDOK/pages/231933858/Ansible+Playbooks
 
-Hvis siden allerede findes:
+Her er page ID:
 
-→ siden opdateres automatisk med nyeste indhold fra Git
+231933858
 
-Dermed bliver Git altid master-versionen, og Confluence bliver automatisk opdateret.
+Dette ID bruges som parent_page_id.
 
-# 📦 Krav
+🔁 Drift og adfærd
 
-# Control node
+Nye .md filer → nye Confluence sider
+Ændrede filer → opdaterer eksisterende sider
+Filnavn styrer Confluence sidens titel
+Struktur i Confluence styres centralt via parent page
 
-* Ansible 2.14+
-* Git installeret
-* adgang til Git repository
-* adgang til Confluence REST API
-* gyldig Confluence API token
+🚀 Kørsel
 
-# 🔐 Authentication
+git clone https://github.com/Allan111281/ansible-automation.git
 
-Login sker med:
+cd ansible-automation
+ansible-playbook confluence_git_sync.yml
 
-* Confluence email
-* Confluence API token
+Ved kørsel:
 
-Vigtigt:
+Confluence email
+API token password
 
-Hvis API token er oprettet på en service account, skal samme bruger bruges ved login.
+🧠 Formål
 
-Username og token skal altid høre sammen.
+Denne løsning sikrer:
 
-# 📝 Resultat i Confluence
-
-Hver side får automatisk:
-
-* tydelig besked om at siden er genereret via Ansible
-* advarsel om at siden kan blive overskrevet
-* besked om at ændringer skal laves i Git
-* automatisk opdatering ved næste deployment
-
-# ▶️ Kør playbooken
-
-ansible-playbook read-git-conf.yml
-
-# 🚀 Typisk brug
-
-Bruges typisk til:
-
-* driftsvejledninger
-* deployment guides
-* playbook dokumentation
-
+centraliseret dokumentation i Git
+automatisk synkronisering til Confluence
+ensartet struktur uden manuel vedligeholdelse
+tydelig adskillelse mellem udvikling (Git) og visning (Confluence)
