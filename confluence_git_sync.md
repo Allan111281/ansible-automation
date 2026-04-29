@@ -1,91 +1,105 @@
-📌 Git → Confluence Sync (Ansible)
+# 📌 Git → Confluence Sync (Ansible)
 
 Denne playbook holder Confluence automatisk synkroniseret med dokumentation fra Git.
 
-Git er den primære kilde (source of truth), mens Confluence fungerer som et læsevenligt dokumentationslag.
+Git er den primære kilde (*source of truth*), mens Confluence fungerer som et læsevenligt dokumentationslag.
 
-⚙️ Funktion
+---
 
-Playbooken håndterer følgende automatisk:
+## ⚙️ Funktion
 
-Læser alle .md filer fra Git repository
-Opretter en Confluence side pr. fil
-Opdaterer eksisterende sider hvis filen ændres
-Bruger filnavnet (uden .md) som sidens titel
-Opretter alle sider som child pages under en defineret parent page
+Playbooken håndterer automatisk:
 
-Eksempel:
-win_services_control_interactive.md → win_services_control_interactive
+* læser alle `.md` filer fra Git repository
+* opretter en Confluence side pr. fil
+* opdaterer eksisterende sider hvis filen ændres
+* bruger filnavnet (uden `.md`) som sidens titel
+* opretter alle sider som child pages under en defineret parent page
 
-📍 Sideplacering i Confluence
+### Eksempel
+
+`win_services_control_interactive.md`
+→ `win_services_control_interactive`
+
+---
+
+## 📍 Sideplacering i Confluence
 
 Alle sider oprettes som child pages under:
 
-https://confluence.umit.dk/spaces/SASDOK/pages/231933858/Ansible+Playbooks
+`https://confluence.umit.dk/spaces/SASDOK/pages/231933858/Ansible+Playbooks`
 
-Placeringen styres af følgende parametre i playbooken:
+Placeringen styres af følgende værdier i playbooken:
 
+```yaml
 confluence_base_url: "https://confluence.umit.dk"
 confluence_space_key: "SASDOK"
 parent_page_id: "231933858"
+```
 
-Definition:
-confluence_base_url → Confluence system URL
-confluence_space_key → Space hvor sider oprettes
-parent_page_id → parent page som alle sider bliver child pages under
+### Definition
 
-✏️ Ændring af placering
+* `confluence_base_url` → Confluence system URL
+* `confluence_space_key` → hvilket Space sider oprettes i
+* `parent_page_id` → hvilken parent page alle sider oprettes under
 
-For at ændre hvor sider oprettes i Confluence:
+---
 
-1. Gå til projektet
+## ✏️ Ændring af placering
 
+### Gå til projektet
+
+```bash
 cd ansible-automation
+```
 
-2. Åbn playbook
+### Åbn playbooken
 
+```bash
 sudo nano confluence_git_sync.yml
+```
 
-3. Ret følgende værdier
-confluence_space_key
-parent_page_id
+### Ret disse værdier
 
-🔎 Find ny parent page
+* `confluence_space_key`
+* `parent_page_id`
 
-Åbn ønsket side i Confluence:
+---
 
-https://confluence.umit.dk/spaces/SASDOK/pages/231933858/Ansible+Playbooks
+## 🔎 Find ny parent page
+
+Eksempel:
+
+`https://confluence.umit.dk/spaces/SASDOK/pages/231933858/Ansible+Playbooks`
 
 Her er page ID:
 
-231933858
+`231933858`
 
-Dette ID bruges som parent_page_id.
+Dette bruges som `parent_page_id`.
 
-🔁 Drift og adfærd
+---
 
-Nye .md filer → nye Confluence sider
-Ændrede filer → opdaterer eksisterende sider
-Filnavn styrer Confluence sidens titel
-Struktur i Confluence styres centralt via parent page
+## 🚀 Kørsel
 
-🚀 Kørsel
-
+```bash
 git clone https://github.com/Allan111281/ansible-automation.git
-
 cd ansible-automation
 ansible-playbook confluence_git_sync.yml
+```
 
-Ved kørsel:
+Ved kørsel bruges:
 
-Confluence email
-API token password
+* Confluence email
+* API token password
 
-🧠 Formål
+---
+
+## 📌 Formål
 
 Denne løsning sikrer:
 
-centraliseret dokumentation i Git
-automatisk synkronisering til Confluence
-ensartet struktur uden manuel vedligeholdelse
-tydelig adskillelse mellem udvikling (Git) og visning (Confluence)
+* centraliseret dokumentation i Git
+* automatisk synkronisering til Confluence
+* ensartet struktur uden manuel vedligeholdelse
+* tydelig adskillelse mellem udvikling og visning
