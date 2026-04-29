@@ -1,10 +1,8 @@
 # 🔐 Certificate Deployment via KeePassXC (Ansible)
 
-Denne playbook bruges til automatisk udrulning af SSL/PFX-certifikater fra en KeePassXC database til Windows hosts.
+Denne playbook bruges til automatisk deployment af SSL/PFX-certifikater fra en KeePassXC database til Windows hosts.
 
-Den er designet til drift, hvor certifikater skal kunne eksporteres og installeres ensartet på tværs af servere uden manuel håndtering.
-
----
+Den sikrer ensartet installation af certifikater uden manuel eksport og import.
 
 ## ⚙️ Funktionalitet
 
@@ -12,31 +10,26 @@ Playbooken udfører følgende proces:
 
 ### 1. Forberedelse
 
-* opretter midlertidig mappe på Windows hosts
-  `C:\temp\certificates`
-* gør klar til eksport af certifikater
+* opretter midlertidig mappe:
 
----
+`C:\temp\certificates`
+
+* klargør Windows hosts til certificate deployment
 
 ### 2. Hentning fra KeePassXC
 
-* logger ind i KeePassXC database
-* finder alle entries under gruppen `Certificates`
+* logger ind i KeePassXC databasen
+* finder entries under gruppen `Certificates`
+* henter:
 
-Henter følgende:
-
-* entry-navne
-* passwords
-* attachments (`.pfx` / `.p12`)
-
----
+  * entry-navne
+  * passwords
+  * attachments (`.pfx` / `.p12`)
 
 ### 3. Eksport
 
-* ekstraherer certifikater fra KeePassXC database
-* gemmer dem lokalt på Windows host i temp folder
-
----
+* eksporterer certifikater fra KeePassXC
+* gemmer dem lokalt på Windows host
 
 ### 4. Installation
 
@@ -50,85 +43,51 @@ Dette sikrer:
 * private keys følger med
 * ensartet installation på alle hosts
 
----
-
 ### 5. Verifikation
 
 * lister installerede certifikater
-* viser `Subject` og `Thumbprint` til validering
+* viser Subject og Thumbprint til validering
 
----
+## 🚀 Kør playbooken
 
-## 🚀 Kørsel (Deployment Guide)
+Hent repository:
 
-### 1. Hent repository
-
-```bash id="ovhwsu"
+```bash
 git clone https://github.com/Allan111281/ansible-automation.git
 ```
 
----
+Gå ind i projektet:
 
-### 2. Gå ind i projektet
-
-```bash id="6u17ec"
+```bash
 cd ansible-automation
 ```
 
----
+Kontrollér inventory:
 
-### 3. Kontrollér inventory
-
-Sørg for at Windows hosts er korrekt defineret i:
-
-`inventory.ini`
-
-### Eksempel
-
-```ini id="4czwsk"
+```ini
 [windows]
 server1
 server2
 server3
 ```
 
----
+Kør playbooken:
 
-### 4. Kør playbooken
-
-```bash id="1dpkp1"
+```bash
 ansible-playbook windows_certificates_keepass_deploy.yml
 ```
 
----
+Ved kørsel bliver du bedt om:
 
-### 5. KeePass login
-
-Ved execution bliver du bedt om:
-
-`KeePass master password`
+* KeePass master password
 
 Dette bruges til at dekryptere databasen og hente certifikaterne.
-
----
-
-## 🧠 Drift og adfærd
-
-Denne playbook sikrer:
-
-* central certificate management
-* automatisk deployment af PFX/P12 certifikater
-* ensartet certificate store setup
-* ingen manuel eksport/import
-* sikker håndtering af passwords via Ansible prompt
-
----
 
 ## 📌 Formål
 
 Denne playbook bruges til:
 
-* certificate management
-* SSL/PFX deployment
+* central certificate management
+* automatisk deployment af PFX/P12 certifikater
 * drift og sikkerhedsopsætning
 * standardisering af Windows certificate stores
