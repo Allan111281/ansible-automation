@@ -126,20 +126,6 @@ Ved kørsel bliver du spurgt om:
 
 ---
 
-# 🔧 Ændringer du typisk laver
-
-## Skift Git repo
-→ git_repo
-
-## Flyt Confluence side
-→ parent_page_id
-
-## Skift Confluence space
-→ confluence_space_key
-
-## Skift server
-→ confluence_base_url
-
 # 📌 Formål
 
 ✔ Git som source of truth  
