@@ -2,7 +2,7 @@
 
 ## 🧭 Overblik
 
-Denne løsning synkroniserer automatisk én Markdown fil fra et Git repository til én Confluence side.
+Denne løsning synkroniserer automatisk én Markdown fil fra et Git/Bit repository til én Confluence side.
 
 Git er **source of truth**, og Confluence fungerer som read-only dokumentationsvisning.
 
