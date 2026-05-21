@@ -1,0 +1,8 @@
+---
+- name: Show welcome message on Windows servers
+  hosts: windows
+  tasks:
+    - name: Display a welcome message with the server name
+      win_shell: |
+        $serverName = $env:COMPUTERNAME
+        msg * "Welcome to $serverName! You are seeing this message via Ansible automation."
