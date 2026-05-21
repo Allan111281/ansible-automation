@@ -1,0 +1,56 @@
+---
+- name: Create a new user in Active Directory
+  hosts: windows
+  gather_facts: no
+  vars_prompt:
+    - name: "user_givenname"
+      prompt: "Enter the user's given (first) name"
+      private: no
+    - name: "user_surname"
+      prompt: "Enter the user's surname (last name)"
+      private: no
+    - name: "user_samaccountname"
+      prompt: "Enter the user's SAM account name (username)"
+      private: no
+    - name: "user_upn"
+      prompt: "Enter the user's User Principal Name (UPN) (e.g. jdoe@yourdomain.com)"
+      private: no
+    - name: "user_password"
+      prompt: "Enter the user's password"
+      private: yes  # Masks the input to hide password
+
+  tasks:
+    - name: Ensure the AD module is imported
+      win_shell: |
+        if (-not (Get-Module -ListAvailable -Name ActiveDirectory)) {
+          Install-WindowsFeature -Name RSAT-AD-PowerShell
+  }
+        Import-Module ActiveDirectory
+      register: ad_module_check
+
+    - name: Check if AD module was imported successfully
+      win_shell: |
+        Get-Module -Name ActiveDirectory
+      failed_when: ad_module_check.rc != 0
+
+    - name: Create a new AD user
+      win_shell: |
+        New-ADUser -Name "{{ user_givenname }} {{ user_surname }}" \
+                   -GivenName "{{ user_givenname }}" \
+                   -Surname "{{ user_surname }}" \
+                   -SamAccountName "{{ user_samaccountname }}" \
+                   -UserPrincipalName "{{ user_upn }}" \
+                   -Path "OU=Users,OU=Allan,DC=elev1,DC=local" \
+                   -AccountPassword (ConvertTo-SecureString "{{ user_password }}" -AsPlainText -Force) \
+                   -Enabled $true
+      register: user_creation
+      ignore_errors: yes
+
+    - name: Check if user was created successfully
+      win_shell: |
+        Get-ADUser -Filter {SamAccountName -eq "{{ user_samaccountname }}"}
+   register: check_user
+
+    - name: Display user creation result
+      debug:
+        msg: "User creation status: {{ check_user.stdout }}"
