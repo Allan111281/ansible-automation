@@ -1,0 +1,8 @@
+- name: Set proxy (SU environment)
+  set_fact:
+    http_proxy: "squid.su.dk:3128"
+    https_proxy: "squid.su.dk:3128"
+  when:
+    - environment is defined
+    - environment == "SU"
+    - ansible_os_family != "Windows"

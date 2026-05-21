@@ -1,0 +1,15 @@
+- name: Cleanup Linux packages
+  file:
+    path: "/tmp/{{ item | basename }}"
+    state: absent
+  loop: "{{ selected_packages }}"
+  when: ansible_os_family != "Windows"
+  ignore_errors: yes
+
+- name: Cleanup Windows packages
+  win_file:
+    path: "C:\\Windows\\Temp\\{{ item | basename }}"
+    state: absent
+  loop: "{{ selected_packages }}"
+  when: ansible_os_family == "Windows"
+  ignore_errors: yes

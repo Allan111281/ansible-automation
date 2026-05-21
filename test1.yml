@@ -1,0 +1,96 @@
+---
+- name: Playbook 2 - Import + 3DES rebuild (FIXED stable version)
+  hosts: windows
+  gather_facts: false
+
+  vars:
+    temp_password: "TempPassword123!"
+    cert_path: "C:\\temp\\certificates"
+    des3_path: "C:\\temp\\certificates\\3des"
+
+  tasks:
+
+  #################################################
+  # GET FILES
+  #################################################
+
+  - name: Get normal certificates
+    ansible.windows.win_find:
+      paths: "{{ cert_path }}"
+      patterns: "*.pfx"
+      excludes: "3des\\*"
+    register: normal_certs
+
+  - name: Get 3DES certificates
+    ansible.windows.win_find:
+      paths: "{{ des3_path }}"
+      patterns: "*.pfx"
+    register: des3_certs
+
+  #################################################
+  # IMPORT NORMAL CERTS
+  #################################################
+
+  - name: Import normal certificates
+    ansible.windows.win_shell: |
+      Import-PfxCertificate `
+        -FilePath "{{ item.path }}" `
+        -CertStoreLocation Cert:\LocalMachine\My `
+        -Exportable | Out-Null
+    loop: "{{ normal_certs.files }}"
+    failed_when: false
+
+  #################################################
+  # REBUILD 3DES CERTS (IMPORTANT FIX HERE)
+  #################################################
+
+  - name: Rebuild 3DES certificates
+  ansible.windows.win_shell: |
+    $pfx = "{{ item.path }}"
+    $pwd = ConvertTo-SecureString "TempPassword123!" -AsPlainText -Force
+
+    $cert = Import-PfxCertificate `
+      -FilePath $pfx `
+      -CertStoreLocation Cert:\LocalMachine\My `
+      -Password $pwd `
+      -Exportable
+
+    $out = Join-Path "C:\temp\certificates\3des" (Split-Path $pfx -Leaf)
+
+    Export-PfxCertificate `
+      -Cert $cert `
+      -FilePath $out `
+      -Password $pwd `
+      -CryptoAlgorithmOption TripleDES_SHA1 | Out-Null
+
+    Import-PfxCertificate `
+      -FilePath $out `
+      -CertStoreLocation Cert:\LocalMachine\My `
+      -Password $pwd `
+      -Exportable | Out-Null
+  loop: "{{ des3_certs.files }}"
+  failed_when: false
+
+  #################################################
+  # VERIFY
+  #################################################
+
+  - name: Verify certificates
+    ansible.windows.win_shell: |
+      Get-ChildItem Cert:\LocalMachine\My |
+      Select Subject, Thumbprint
+    register: certs
+
+  - name: Show certs
+    debug:
+      var: certs.stdout_lines
+
+  #################################################
+  # DONE
+  #################################################
+
+  - name: Done
+    debug:
+      msg:
+        - "Import + 3DES rebuild finished"
+        - "Check Cert:\\LocalMachine\\My"

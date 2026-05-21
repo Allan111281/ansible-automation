@@ -1,0 +1,28 @@
+tsm_packages:
+  RedHat:
+    - https://medialib.umit.dk/tsm/linux/gskcrypt64-8.0.55.31.linux.x86_64.rpm
+    - https://medialib.umit.dk/tsm/linux/gskssl64-8.0.55.31.linux.x86_64.rpm
+    - https://medialib.umit.dk/tsm/linux/TIVsm-API64.x86_64.rpm
+    - https://medialib.umit.dk/tsm/linux/TIVsm-BA.x86_64.rpm
+
+  OracleLinux:
+    - https://medialib.umit.dk/tsm/linux/gskcrypt64-8.0.55.31.linux.x86_64.rpm
+    - https://medialib.umit.dk/tsm/linux/gskssl64-8.0.55.31.linux.x86_64.rpm
+    - https://medialib.umit.dk/tsm/linux/TIVsm-API64.x86_64.rpm
+    - https://medialib.umit.dk/tsm/linux/TIVsm-BA.x86_64.rpm
+
+  Debian:
+    - https://medialib.umit.dk/tsm/ubuntu/gskssl64_8.0-55.31.linux.x86_64.deb
+    - https://medialib.umit.dk/tsm/ubuntu/gskcrypt64_8.0-55.31.linux.x86_64.deb
+    - https://medialib.umit.dk/tsm/ubuntu/tivsm-api64.amd64.deb
+    - https://medialib.umit.dk/tsm/ubuntu/tivsm-ba.amd64.deb
+
+  Windows:
+    - https://medialib.umit.dk/tsm/windows/8.1.22.0-TIV-TSMBAC-WinX64.exe
+
+
+mssql_packages:
+  - https://medialib.umit.dk/tsm/mssql/SP_DBS_8.1.21_DP_MS_SQL_ML.exe
+
+oracle_packages:
+  - https://medialib.umit.dk/tsm/oracle/TDP-Oracle.x86_64.bin
