@@ -32,7 +32,7 @@ Det betyder:
 ## Eksempel på hvad der ligger i Vault
 
 ```yaml
-ansible_user: svc_ansible@ELEV1.LOCAL
+ansible_user: alchr@ELEV1.LOCAL
 ansible_password: SuperSecretPassword
 ansible_connection: winrm
 ansible_winrm_transport: kerberos
@@ -105,7 +105,7 @@ Dette betyder:
 
 ---
 
-## Vigtigt (scope)
+## Vigtigt
 
 Denne fil gælder kun for **den bruger der ejer den**.
 
@@ -210,12 +210,6 @@ Når en fil er tilføjet i `.gitignore`, vil Git:
 * ikke pushe den til Git repository
 
 ---
-
-## Eksempel
-
-```gitignore
-.vault_pass
-```
 
 ---
 
