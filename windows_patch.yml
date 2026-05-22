@@ -1,0 +1,16 @@
+---
+- name: Patch Windows Server
+  hosts: windows
+  tasks:
+    - name: Install security updates
+      ansible.windows.win_updates:
+        category_names:
+          - SecurityUpdates
+          - CriticalUpdates
+        reboot: true
+        reboot_timeout: 600
+      register: update_result
+
+    - name: Show update results
+      ansible.builtin.debug:
+        msg: "Installed {{ update_result.installed_update_count }} updates. Reboot required: {{ update_result.reboot_required }}"
