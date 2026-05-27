@@ -1,0 +1,225 @@
+---
+- name: Git → Confluence Single Page Sync (Jenkins Version)
+  hosts: localhost
+  gather_facts: no
+
+  vars:
+
+    ########################################################
+    # CONFLUENCE TARGET
+    ########################################################
+    confluence_base_url: "{{ lookup('env', 'CONFLUENCE_BASE_URL') }}"
+    confluence_space_key: "{{ lookup('env', 'CONFLUENCE_SPACE_KEY') }}"
+    parent_page_id: "{{ lookup('env', 'PARENT_PAGE_ID') }}"
+
+    ########################################################
+    # GIT INPUT
+    ########################################################
+    git_repo: "{{ lookup('env', 'GIT_REPO') }}"
+
+    ########################################################
+    # CONFLUENCE AUTH
+    ########################################################
+    confluence_user: "{{ lookup('env', 'CONFLUENCE_USER') }}"
+    confluence_password: "{{ lookup('env', 'CONFLUENCE_PASSWORD') }}"
+
+    ########################################################
+    # PAGE INFO
+    ########################################################
+    confluence_page_title: "{{ lookup('env', 'CONFLUENCE_PAGE_TITLE') }}"
+
+    ########################################################
+    # LOCAL TEMP PATH
+    ########################################################
+    repo_dest: "/tmp/repo"
+
+  tasks:
+
+    ########################################################
+    # VALIDATE SSH URL
+    ########################################################
+
+    - name: Validate SSH Git URL
+      fail:
+        msg: "Invalid Git SSH URL. Use GitHub or Bitbucket SSH clone URL"
+      when: git_repo is not match('^(git@github\\.com:|git@bitbucket\\.umit\\.dk:|ssh://git@bitbucket\\.umit\\.dk:7999/)')
+
+    ########################################################
+    # NORMALIZE BITBUCKET SSH URL
+    ########################################################
+
+    - name: Normalize Git URL
+      set_fact:
+        git_repo_clean: "{{ git_repo | regex_replace('^ssh://git@bitbucket.umit.dk:7999/', 'git@bitbucket.umit.dk:') }}"
+
+    ########################################################
+    # DEBUG
+    ########################################################
+
+    - name: Show final Git repo URL
+      debug:
+        msg: "{{ git_repo_clean }}"
+
+    ########################################################
+    # CLEAN WORKSPACE
+    ########################################################
+
+    - name: Clean workspace
+      file:
+        path: "{{ repo_dest }}"
+        state: absent
+
+    ########################################################
+    # CLONE REPOSITORY
+    ########################################################
+
+    - name: Clone Git repository via SSH
+      git:
+        repo: "{{ git_repo_clean }}"
+        dest: "{{ repo_dest }}"
+        force: yes
+        accept_hostkey: yes
+
+    ########################################################
+    # FIND MARKDOWN FILE
+    ########################################################
+
+    - name: Find markdown file
+      find:
+        paths: "{{ repo_dest }}"
+        patterns: "*.md"
+      register: md_files
+
+    - name: Fail if no markdown file found
+      fail:
+        msg: "No markdown (.md) file found in repository"
+      when: md_files.files | length == 0
+
+    - name: Set markdown file
+      set_fact:
+        md_file: "{{ md_files.files[0].path }}"
+
+    ########################################################
+    # INSTALL PANDOC
+    ########################################################
+
+    - name: Install pandoc
+      package:
+        name: pandoc
+        state: present
+      become: yes
+      failed_when: false
+
+    ########################################################
+    # CONVERT MARKDOWN → HTML
+    ########################################################
+
+    - name: Convert markdown to HTML
+      shell: pandoc "{{ md_file }}" -f markdown -t html
+      register: html_content
+      changed_when: false
+
+    ########################################################
+    # CHECK IF PAGE EXISTS
+    ########################################################
+
+    - name: Check if Confluence page exists
+      uri:
+        url: "{{ confluence_base_url }}/rest/api/content?title={{ confluence_page_title | urlencode }}&spaceKey={{ confluence_space_key }}&expand=version"
+        method: GET
+        user: "{{ confluence_user }}"
+        password: "{{ confluence_password }}"
+        force_basic_auth: yes
+        headers:
+          Accept: "application/json"
+        return_content: yes
+      register: page_lookup
+
+    - name: Set page state
+      set_fact:
+        page_exists: "{{ page_lookup.json.size | int > 0 }}"
+
+    ########################################################
+    # BUILD CONTENT
+    ########################################################
+
+    - name: Build final Confluence content
+      set_fact:
+        final_content: |
+          <ac:structured-macro ac:name="warning">
+            <ac:rich-text-body>
+              <p><b>⚠️ AUTO-GENERATED PAGE</b></p>
+              <p>This page is generated automatically from Git Markdown.</p>
+              <p><b>Do NOT edit this page directly in Confluence.</b></p>
+            </ac:rich-text-body>
+          </ac:structured-macro>
+          <hr/>
+          {{ html_content.stdout }}
+
+    ########################################################
+    # CREATE OR UPDATE PAGE
+    ########################################################
+
+    - name: Sync page to Confluence
+      uri:
+
+        url: >-
+          {{
+            confluence_base_url +
+            (
+              '/rest/api/content/' + page_lookup.json.results[0].id
+              if page_exists
+              else '/rest/api/content'
+            )
+          }}
+
+        method: "{{ 'PUT' if page_exists else 'POST' }}"
+
+        user: "{{ confluence_user }}"
+        password: "{{ confluence_password }}"
+        force_basic_auth: yes
+
+        headers:
+          Content-Type: "application/json"
+          Accept: "application/json"
+
+        body_format: json
+
+        body:
+          id: "{{ page_lookup.json.results[0].id if page_exists else omit }}"
+          type: page
+          title: "{{ confluence_page_title }}"
+
+          version: >-
+            {{
+              {'number': page_lookup.json.results[0].version.number | int + 1}
+              if page_exists else omit
+            }}
+
+          space:
+            key: "{{ confluence_space_key }}"
+
+          ancestors:
+            - id: "{{ parent_page_id }}"
+
+          body:
+            storage:
+              representation: storage
+              value: "{{ final_content }}"
+
+    ########################################################
+    # CLEANUP
+    ########################################################
+
+    - name: Cleanup workspace
+      file:
+        path: "{{ repo_dest }}"
+        state: absent
+
+    ########################################################
+    # DONE
+    ########################################################
+
+    - name: Success message
+      debug:
+        msg: "Confluence page '{{ confluence_page_title }}' synced successfully"
