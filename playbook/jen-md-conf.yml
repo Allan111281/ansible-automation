@@ -1,5 +1,5 @@
 ---
-- name: Git → Confluence Sync (Jenkins Parameters Safe)
+- name: Git → Confluence Sync (Jenkins Stable Version)
   hosts: localhost
   gather_facts: no
 
@@ -17,19 +17,19 @@
   tasks:
 
     # ----------------------------
-    # VALIDATE INPUTS
+    # VALIDATE INPUT
     # ----------------------------
     - name: Validate required env vars
       fail:
-        msg: "Missing required Jenkins parameter(s)"
+        msg: "Missing Jenkins parameters"
       when:
-        - git_repo is not defined or git_repo | trim == ''
-        - confluence_user is not defined or confluence_user | trim == ''
-        - confluence_password is not defined or confluence_password | trim == ''
-        - confluence_page_title is not defined or confluence_page_title | trim == ''
+        - git_repo | default('') | trim == ''
+        - confluence_user | default('') | trim == ''
+        - confluence_password | default('') | trim == ''
+        - confluence_page_title | default('') | trim == ''
 
     # ----------------------------
-    # NORMALIZE GIT URL (SSH + HTTPS)
+    # NORMALIZE GIT URL
     # ----------------------------
     - name: Normalize Git URL
       set_fact:
@@ -74,7 +74,7 @@
 
     - name: Fail if no markdown file found
       fail:
-        msg: "No .md file found in repo"
+        msg: "No markdown file found"
       when: md_files.files | length == 0
 
     - name: Set markdown file
@@ -82,19 +82,15 @@
         md_file: "{{ md_files.files[0].path }}"
 
     # ----------------------------
-    # READ MARKDOWN (NO PANDOC!)
+    # 🔥 FIX: USE PANDOC (SAME AS WORKING WSL VERSION)
     # ----------------------------
-    - name: Read markdown file
-      slurp:
-        src: "{{ md_file }}"
-      register: md_raw
-
-    - name: Convert markdown to text/html-safe
-      set_fact:
-        html_content: "{{ (md_raw.content | b64decode) | replace('\n', '<br/>') }}"
+    - name: Convert markdown to HTML (pandoc)
+      shell: pandoc "{{ md_file }}" -f markdown -t html
+      register: html_content
+      changed_when: false
 
     # ----------------------------
-    # CHECK CONFLUENCE PAGE
+    # CHECK PAGE
     # ----------------------------
     - name: Check if page exists
       uri:
@@ -111,22 +107,22 @@
         page_exists: "{{ page_lookup.json.results is defined and (page_lookup.json.results | length > 0) }}"
 
     # ----------------------------
-    # BUILD CONTENT
+    # BUILD CONTENT (SAFE HTML)
     # ----------------------------
     - name: Build Confluence content
       set_fact:
         final_content: |
           <ac:structured-macro ac:name="warning">
             <ac:rich-text-body>
-              <p><b>AUTO-GENERATED PAGE (JENKINS)</b></p>
+              <p><b>AUTO-GENERATED (JENKINS)</b></p>
               <p>Do NOT edit manually.</p>
             </ac:rich-text-body>
           </ac:structured-macro>
           <hr/>
-          {{ html_content }}
+          {{ html_content.stdout }}
 
     # ----------------------------
-    # CREATE / UPDATE PAGE
+    # CREATE / UPDATE
     # ----------------------------
     - name: Sync page to Confluence
       uri:
@@ -142,10 +138,13 @@
         user: "{{ confluence_user }}"
         password: "{{ confluence_password }}"
         force_basic_auth: yes
+
         headers:
           Content-Type: "application/json"
           Accept: "application/json"
+
         body_format: json
+
         body:
           id: "{{ page_lookup.json.results[0].id if page_exists else omit }}"
           type: page
@@ -169,4 +168,4 @@
     # ----------------------------
     - name: Success
       debug:
-        msg: "Confluence page '{{ confluence_page_title }}' synced successfully"
+        msg: "Confluence page synced successfully"
