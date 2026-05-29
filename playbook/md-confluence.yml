@@ -1,5 +1,5 @@
 ---
-- name: Git → Confluence Single Page Sync (GitHub + Bitbucket SSH)
+- name: Git → Confluence Single Page Sync (Jenkins Hardened)
   hosts: localhost
   gather_facts: no
 
@@ -11,7 +11,7 @@
 
   vars_prompt:
     - name: git_repo
-      prompt: "Git SSH clone URL (GitHub or Bitbucket)"
+      prompt: "Git repo (SSH or HTTPS)"
       private: no
 
     - name: confluence_user
@@ -19,7 +19,7 @@
       private: no
 
     - name: confluence_password
-      prompt: "Confluence Password/API token"
+      prompt: "Confluence API token/password"
       private: yes
 
     - name: confluence_page_title
@@ -28,31 +28,52 @@
 
   tasks:
 
-    - name: Validate SSH Git URL
+    # ----------------------------
+    # VALIDATION (ROBUST)
+    # ----------------------------
+    - name: Validate git repo input
       fail:
-        msg: "Invalid Git SSH URL. Use GitHub or Bitbucket SSH clone URL"
-      when: git_repo is not match('^(git@github\\.com:|git@bitbucket\\.umit\\.dk:|ssh://git@bitbucket\\.umit\\.dk:7999/)')
+        msg: "git_repo is empty or invalid"
+      when: git_repo is not defined or git_repo | trim == ''
 
-    - name: Normalize Git URL
+    # ----------------------------
+    # NORMALIZE GIT URL (SSH + HTTPS)
+    # ----------------------------
+    - name: Normalize Git URL (HTTPS → SSH)
       set_fact:
-        git_repo_clean: "{{ git_repo | regex_replace('^ssh://git@bitbucket.umit.dk:7999/', 'git@bitbucket.umit.dk:') }}"
+        git_repo_clean: >-
+          {{
+            git_repo
+            | trim
+            | regex_replace('^https://github\\.com/', 'git@github.com:')
+            | regex_replace('^https://bitbucket\\.umit\\.dk/scm/', 'git@bitbucket.umit.dk:')
+          }}
 
     - name: Show final Git repo URL
       debug:
         msg: "{{ git_repo_clean }}"
 
+    # ----------------------------
+    # CLEAN WORKSPACE
+    # ----------------------------
     - name: Clean workspace
       file:
         path: "{{ repo_dest }}"
         state: absent
 
-    - name: Clone repository via SSH
+    # ----------------------------
+    # CLONE REPO
+    # ----------------------------
+    - name: Clone repository
       git:
         repo: "{{ git_repo_clean }}"
         dest: "{{ repo_dest }}"
         force: yes
         accept_hostkey: yes
 
+    # ----------------------------
+    # FIND MARKDOWN
+    # ----------------------------
     - name: Find markdown file
       find:
         paths: "{{ repo_dest }}"
@@ -61,25 +82,25 @@
 
     - name: Fail if no markdown file found
       fail:
-        msg: "No markdown (.md) file found in repository"
+        msg: "No markdown file found in repo"
       when: md_files.files | length == 0
 
     - name: Set markdown file
       set_fact:
         md_file: "{{ md_files.files[0].path }}"
 
-    - name: Install pandoc
-      apt:
-        name: pandoc
-        state: present
-      become: yes
-
+    # ----------------------------
+    # CONVERT MARKDOWN → HTML
+    # ----------------------------
     - name: Convert markdown to HTML
       shell: pandoc "{{ md_file }}" -f markdown -t html
       register: html_content
       changed_when: false
 
-    - name: Check if Confluence page exists
+    # ----------------------------
+    # CHECK PAGE
+    # ----------------------------
+    - name: Check if page exists
       uri:
         url: "{{ confluence_base_url }}/rest/api/content?title={{ confluence_page_title | urlencode }}&spaceKey={{ confluence_space_key }}&expand=version"
         method: GET
@@ -89,22 +110,28 @@
         return_content: yes
       register: page_lookup
 
-    - name: Set page state
+    - name: Set page state safely
       set_fact:
-        page_exists: "{{ page_lookup.json.size | int > 0 }}"
+        page_exists: "{{ page_lookup.json.results is defined and (page_lookup.json.results | length > 0) }}"
 
-    - name: Build final Confluence content
+    # ----------------------------
+    # BUILD CONTENT
+    # ----------------------------
+    - name: Build Confluence content
       set_fact:
         final_content: |
           <ac:structured-macro ac:name="warning">
             <ac:rich-text-body>
               <p><b>AUTO-GENERATED PAGE</b></p>
-              <p>Do NOT edit this page directly in Confluence.</p>
+              <p>Do NOT edit manually.</p>
             </ac:rich-text-body>
           </ac:structured-macro>
           <hr/>
           {{ html_content.stdout }}
 
+    # ----------------------------
+    # CREATE / UPDATE PAGE
+    # ----------------------------
     - name: Sync page to Confluence
       uri:
         url: >-
@@ -141,6 +168,9 @@
               representation: storage
               value: "{{ final_content }}"
 
+    # ----------------------------
+    # CLEANUP
+    # ----------------------------
     - name: Cleanup workspace
       file:
         path: "{{ repo_dest }}"

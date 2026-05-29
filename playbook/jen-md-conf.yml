@@ -1,0 +1,172 @@
+---
+- name: Git → Confluence Sync (Jenkins Parameters Safe)
+  hosts: localhost
+  gather_facts: no
+
+  vars:
+    confluence_base_url: "{{ lookup('env', 'CONFLUENCE_BASE_URL') }}"
+    confluence_space_key: "{{ lookup('env', 'CONFLUENCE_SPACE_KEY') }}"
+    parent_page_id: "{{ lookup('env', 'PARENT_PAGE_ID') }}"
+    repo_dest: "/tmp/repo"
+
+    git_repo: "{{ lookup('env', 'GIT_REPO') }}"
+    confluence_user: "{{ lookup('env', 'CONFLUENCE_USER') }}"
+    confluence_password: "{{ lookup('env', 'CONFLUENCE_PASSWORD') }}"
+    confluence_page_title: "{{ lookup('env', 'CONFLUENCE_PAGE_TITLE') }}"
+
+  tasks:
+
+    # ----------------------------
+    # VALIDATE INPUTS
+    # ----------------------------
+    - name: Validate required env vars
+      fail:
+        msg: "Missing required Jenkins parameter(s)"
+      when:
+        - git_repo is not defined or git_repo | trim == ''
+        - confluence_user is not defined or confluence_user | trim == ''
+        - confluence_password is not defined or confluence_password | trim == ''
+        - confluence_page_title is not defined or confluence_page_title | trim == ''
+
+    # ----------------------------
+    # NORMALIZE GIT URL (SSH + HTTPS)
+    # ----------------------------
+    - name: Normalize Git URL
+      set_fact:
+        git_repo_clean: >-
+          {{
+            git_repo
+            | trim
+            | regex_replace('^https://github\\.com/', 'git@github.com:')
+            | regex_replace('^https://bitbucket\\.umit\\.dk/scm/', 'git@bitbucket.umit.dk:')
+          }}
+
+    - name: Show repo
+      debug:
+        msg: "{{ git_repo_clean }}"
+
+    # ----------------------------
+    # CLEAN WORKSPACE
+    # ----------------------------
+    - name: Clean workspace
+      file:
+        path: "{{ repo_dest }}"
+        state: absent
+
+    # ----------------------------
+    # CLONE REPO
+    # ----------------------------
+    - name: Clone repo
+      git:
+        repo: "{{ git_repo_clean }}"
+        dest: "{{ repo_dest }}"
+        force: yes
+        accept_hostkey: yes
+
+    # ----------------------------
+    # FIND MARKDOWN
+    # ----------------------------
+    - name: Find markdown file
+      find:
+        paths: "{{ repo_dest }}"
+        patterns: "*.md"
+      register: md_files
+
+    - name: Fail if no markdown file found
+      fail:
+        msg: "No .md file found in repo"
+      when: md_files.files | length == 0
+
+    - name: Set markdown file
+      set_fact:
+        md_file: "{{ md_files.files[0].path }}"
+
+    # ----------------------------
+    # READ MARKDOWN (NO PANDOC!)
+    # ----------------------------
+    - name: Read markdown file
+      slurp:
+        src: "{{ md_file }}"
+      register: md_raw
+
+    - name: Convert markdown to text/html-safe
+      set_fact:
+        html_content: "{{ (md_raw.content | b64decode) | replace('\n', '<br/>') }}"
+
+    # ----------------------------
+    # CHECK CONFLUENCE PAGE
+    # ----------------------------
+    - name: Check if page exists
+      uri:
+        url: "{{ confluence_base_url }}/rest/api/content?title={{ confluence_page_title | urlencode }}&spaceKey={{ confluence_space_key }}&expand=version"
+        method: GET
+        user: "{{ confluence_user }}"
+        password: "{{ confluence_password }}"
+        force_basic_auth: yes
+        return_content: yes
+      register: page_lookup
+
+    - name: Set page state safe
+      set_fact:
+        page_exists: "{{ page_lookup.json.results is defined and (page_lookup.json.results | length > 0) }}"
+
+    # ----------------------------
+    # BUILD CONTENT
+    # ----------------------------
+    - name: Build Confluence content
+      set_fact:
+        final_content: |
+          <ac:structured-macro ac:name="warning">
+            <ac:rich-text-body>
+              <p><b>AUTO-GENERATED PAGE (JENKINS)</b></p>
+              <p>Do NOT edit manually.</p>
+            </ac:rich-text-body>
+          </ac:structured-macro>
+          <hr/>
+          {{ html_content }}
+
+    # ----------------------------
+    # CREATE / UPDATE PAGE
+    # ----------------------------
+    - name: Sync page to Confluence
+      uri:
+        url: >-
+          {{
+            confluence_base_url +
+            (
+              '/rest/api/content/' + page_lookup.json.results[0].id
+              if page_exists else '/rest/api/content'
+            )
+          }}
+        method: "{{ 'PUT' if page_exists else 'POST' }}"
+        user: "{{ confluence_user }}"
+        password: "{{ confluence_password }}"
+        force_basic_auth: yes
+        headers:
+          Content-Type: "application/json"
+          Accept: "application/json"
+        body_format: json
+        body:
+          id: "{{ page_lookup.json.results[0].id if page_exists else omit }}"
+          type: page
+          title: "{{ confluence_page_title }}"
+          space:
+            key: "{{ confluence_space_key }}"
+          ancestors:
+            - id: "{{ parent_page_id }}"
+          version: >-
+            {{
+              {'number': page_lookup.json.results[0].version.number | int + 1}
+              if page_exists else omit
+            }}
+          body:
+            storage:
+              representation: storage
+              value: "{{ final_content }}"
+
+    # ----------------------------
+    # DONE
+    # ----------------------------
+    - name: Success
+      debug:
+        msg: "Confluence page '{{ confluence_page_title }}' synced successfully"
