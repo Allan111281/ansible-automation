@@ -114,8 +114,8 @@
         final_content: |
           <ac:structured-macro ac:name="warning">
             <ac:rich-text-body>
-              <p><b>AUTO-GENERATED (JENKINS)</b></p>
-              <p>Do NOT edit manually.</p>
+              <p><b>AUTO-GENERATED PAGE (JENKINS - ANSIBLE)</b></p>
+              <p>Do NOT edit manually, changes should be made in the .md file and then run the job again.</p>
             </ac:rich-text-body>
           </ac:structured-macro>
           <hr/>
