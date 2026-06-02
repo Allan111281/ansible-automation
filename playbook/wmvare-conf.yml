@@ -1,13 +1,9 @@
 ---
-- name: VMware Role-based Inventory → Confluence
+- name: VMware Dynamic Folder Tree → Confluence
   hosts: localhost
   gather_facts: no
 
   vars:
-
-    # -----------------------
-    # CONFLUENCE
-    # -----------------------
     confluence_base_url: "{{ lookup('env', 'CONFLUENCE_BASE_URL') }}"
     confluence_space_key: "{{ lookup('env', 'CONFLUENCE_SPACE_KEY') }}"
     parent_page_id: "{{ lookup('env', 'PARENT_PAGE_ID') }}"
@@ -15,20 +11,18 @@
     confluence_password: "{{ lookup('env', 'CONFLUENCE_PASSWORD') }}"
     confluence_page_title: "{{ lookup('env', 'CONFLUENCE_PAGE_TITLE') }}"
 
-    # -----------------------
-    # VMWARE
-    # -----------------------
     vcenter_hostname: "{{ lookup('env', 'VCENTER_HOST') }}"
     vcenter_user: "{{ lookup('env', 'VCENTER_USER') }}"
     vcenter_password: "{{ lookup('env', 'VCENTER_PASSWORD') }}"
-    vmware_folders: "{{ lookup('env', 'VMWARE_FOLDERS').split(',') }}"
+
+    environment: "{{ lookup('env', 'ENVIRONMENT') }}"   # sandbox/dans/esas/stads
 
   tasks:
 
-  # -----------------------
+  # -----------------------------
   # GET VMS
-  # -----------------------
-  - name: Get VM info
+  # -----------------------------
+  - name: Get VM inventory
     community.vmware.vmware_vm_info:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_user }}"
@@ -36,127 +30,68 @@
       validate_certs: false
     register: vm_info
 
-  # -----------------------
-  # FILTER BY FOLDERS
-  # -----------------------
-  - name: Filter VMs by folder
+  # -----------------------------
+  # FILTER ROOT ENVIRONMENT
+  # -----------------------------
+  - name: Filter by environment root folder
     set_fact:
-      filtered_vms: >-
+      env_vms: >-
         {{
           vm_info.virtual_machines
           | selectattr('folder', 'defined')
-          | selectattr('folder', 'in', vmware_folders)
+          | select('search', environment)
           | list
         }}
 
-  # fallback match
-  - name: fallback folder match
+  # -----------------------------
+  # EXTRACT SUBFOLDERS DYNAMICALLY
+  # -----------------------------
+  - name: Build folder list
     set_fact:
-      filtered_vms: >-
+      folder_groups: >-
         {{
-          vm_info.virtual_machines
-          | selectattr('folder', 'defined')
-          | select('search', vmware_folders | join('|'))
-          | list
+          env_vms
+          | groupby('folder')
         }}
-    when: filtered_vms | length == 0
 
-  # -----------------------
-  # GROUP BY ROLE (PowerShell logic)
-  # -----------------------
-  - name: Group VMs by role
-    set_fact:
-      app_vms: "{{ filtered_vms | selectattr('guest_name', 'defined') | selectattr('role', 'equalto', 'app') | list }}"
-      db_vms: "{{ filtered_vms | selectattr('role', 'equalto', 'db') | list }}"
-      misc_vms: "{{ filtered_vms | rejectattr('role', 'equalto', 'app') | rejectattr('role', 'equalto', 'db') | list }}"
-
-  # fallback if role field is inconsistent (common in vCenter)
-  - name: safer grouping fallback
-    set_fact:
-      app_vms: "{{ filtered_vms | select('search', 'app') | list }}"
-      db_vms: "{{ filtered_vms | select('search', 'db') | list }}"
-      misc_vms: "{{ filtered_vms | select('search', 'misc') | list }}"
-    when: app_vms is not defined or db_vms is not defined
-
-  # -----------------------
-  # BUILD TABLES
-  # -----------------------
-  - name: Build HTML tables
-    set_fact:
-      app_table: |
-        <h2>APP Servers</h2>
-        <table border="1">
-        <tr><th>Name</th><th>Power</th><th>CPU</th><th>RAM</th></tr>
-        {% for vm in app_vms %}
-        <tr>
-          <td>{{ vm.guest_name }}</td>
-          <td>{{ vm.power_state }}</td>
-          <td>{{ vm.cpu_count }}</td>
-          <td>{{ vm.memory_mb }}</td>
-        </tr>
-        {% endfor %}
-        </table>
-
-      db_table: |
-        <h2>DB Servers</h2>
-        <table border="1">
-        <tr><th>Name</th><th>Power</th><th>CPU</th><th>RAM</th></tr>
-        {% for vm in db_vms %}
-        <tr>
-          <td>{{ vm.guest_name }}</td>
-          <td>{{ vm.power_state }}</td>
-          <td>{{ vm.cpu_count }}</td>
-          <td>{{ vm.memory_mb }}</td>
-        </tr>
-        {% endfor %}
-        </table>
-
-      misc_table: |
-        <h2>MISC Servers</h2>
-        <table border="1">
-        <tr><th>Name</th><th>Power</th><th>CPU</th><th>RAM</th></tr>
-        {% for vm in misc_vms %}
-        <tr>
-          <td>{{ vm.guest_name }}</td>
-          <td>{{ vm.power_state }}</td>
-          <td>{{ vm.cpu_count }}</td>
-          <td>{{ vm.memory_mb }}</td>
-        </tr>
-        {% endfor %}
-        </table>
-
-  # -----------------------
-  # BUILD CONFLUENCE "TABS" (SIMULATED)
-  # -----------------------
-  - name: Build Confluence page with role sections
+  # -----------------------------
+  # BUILD DYNAMIC HTML
+  # -----------------------------
+  - name: Build Confluence content dynamically
     set_fact:
       final_content: |
-        <ac:structured-macro ac:name="warning">
-          <ac:rich-text-body>
-            <p><b>AUTO-GENERATED VMware INVENTORY</b></p>
-            <p>Grouped by role (APP / DB / MISC)</p>
-          </ac:rich-text-body>
-        </ac:structured-macro>
+        <h1>VMware Inventory - {{ environment }}</h1>
+
+        {% for group in folder_groups %}
 
         <hr/>
+        <h2>{{ group.0 }}</h2>
 
-        <h1>APP</h1>
-        {{ app_table }}
+        <table border="1">
+          <tr>
+            <th>VM</th>
+            <th>Power</th>
+            <th>CPU</th>
+            <th>RAM</th>
+          </tr>
 
-        <hr/>
+          {% for vm in group.1 %}
+          <tr>
+            <td>{{ vm.guest_name }}</td>
+            <td>{{ vm.power_state }}</td>
+            <td>{{ vm.cpu_count }}</td>
+            <td>{{ vm.memory_mb }}</td>
+          </tr>
+          {% endfor %}
 
-        <h1>DB</h1>
-        {{ db_table }}
+        </table>
 
-        <hr/>
+        {% endfor %}
 
-        <h1>MISC</h1>
-        {{ misc_table }}
-
-  # -----------------------
-  # CHECK PAGE
-  # -----------------------
-  - name: Check Confluence page
+  # -----------------------------
+  # CONFLUENCE CHECK + UPDATE (same as before)
+  # -----------------------------
+  - name: Check page
     uri:
       url: "{{ confluence_base_url }}/rest/api/content?title={{ confluence_page_title | urlencode }}&spaceKey={{ confluence_space_key }}&expand=version"
       method: GET
@@ -166,14 +101,10 @@
       return_content: yes
     register: page_lookup
 
-  - name: page exists
-    set_fact:
+  - set_fact:
       page_exists: "{{ page_lookup.json.results | length > 0 }}"
 
-  # -----------------------
-  # PUSH TO CONFLUENCE
-  # -----------------------
-  - name: Create or update page
+  - name: Push to Confluence
     uri:
       url: >-
         {{
@@ -187,12 +118,9 @@
       user: "{{ confluence_user }}"
       password: "{{ confluence_password }}"
       force_basic_auth: yes
-
       headers:
         Content-Type: "application/json"
-
       body_format: json
-
       body:
         id: "{{ page_lookup.json.results[0].id if page_exists else omit }}"
         type: page
@@ -210,9 +138,3 @@
           storage:
             representation: storage
             value: "{{ final_content }}"
-
-  # -----------------------
-  # DONE
-  # -----------------------
-  - debug:
-      msg: "VMware role-based Confluence page updated"
