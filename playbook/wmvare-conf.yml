@@ -15,7 +15,8 @@
     vcenter_user: "{{ lookup('env', 'VCENTER_USER') }}"
     vcenter_password: "{{ lookup('env', 'VCENTER_PASSWORD') }}"
 
-    vm_environment: "{{ lookup('env', 'ENVIRONMENT') }}"
+    # FIX: safe variable + fallback
+    vm_environment: "{{ lookup('env', 'ENVIRONMENT') | default('UNKNOWN') }}"
 
   tasks:
 
@@ -43,7 +44,7 @@
         }}
 
   # -----------------------------
-  # EXTRACT SUBFOLDERS DYNAMICALLY
+  # EXTRACT SUBFOLDERS
   # -----------------------------
   - name: Build folder list
     set_fact:
@@ -54,12 +55,12 @@
         }}
 
   # -----------------------------
-  # BUILD DYNAMIC HTML
+  # BUILD HTML
   # -----------------------------
   - name: Build Confluence content dynamically
     set_fact:
       final_content: |
-        <h1>VMware Inventory - {{ environment }}</h1>
+        <h1>VMware Inventory - {{ vm_environment }}</h1>
 
         {% for group in folder_groups %}
 
@@ -88,7 +89,7 @@
         {% endfor %}
 
   # -----------------------------
-  # CONFLUENCE CHECK + UPDATE (same as before)
+  # CHECK PAGE
   # -----------------------------
   - name: Check page
     uri:
@@ -103,6 +104,9 @@
   - set_fact:
       page_exists: "{{ page_lookup.json.results | length > 0 }}"
 
+  # -----------------------------
+  # PUSH TO CONFLUENCE
+  # -----------------------------
   - name: Push to Confluence
     uri:
       url: >-
