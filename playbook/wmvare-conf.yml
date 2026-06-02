@@ -1,0 +1,218 @@
+---
+- name: VMware Role-based Inventory → Confluence
+  hosts: localhost
+  gather_facts: no
+
+  vars:
+
+    # -----------------------
+    # CONFLUENCE
+    # -----------------------
+    confluence_base_url: "{{ lookup('env', 'CONFLUENCE_BASE_URL') }}"
+    confluence_space_key: "{{ lookup('env', 'CONFLUENCE_SPACE_KEY') }}"
+    parent_page_id: "{{ lookup('env', 'PARENT_PAGE_ID') }}"
+    confluence_user: "{{ lookup('env', 'CONFLUENCE_USER') }}"
+    confluence_password: "{{ lookup('env', 'CONFLUENCE_PASSWORD') }}"
+    confluence_page_title: "{{ lookup('env', 'CONFLUENCE_PAGE_TITLE') }}"
+
+    # -----------------------
+    # VMWARE
+    # -----------------------
+    vcenter_hostname: "{{ lookup('env', 'VCENTER_HOST') }}"
+    vcenter_user: "{{ lookup('env', 'VCENTER_USER') }}"
+    vcenter_password: "{{ lookup('env', 'VCENTER_PASSWORD') }}"
+    vmware_folders: "{{ lookup('env', 'VMWARE_FOLDERS').split(',') }}"
+
+  tasks:
+
+  # -----------------------
+  # GET VMS
+  # -----------------------
+  - name: Get VM info
+    community.vmware.vmware_vm_info:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_user }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: false
+    register: vm_info
+
+  # -----------------------
+  # FILTER BY FOLDERS
+  # -----------------------
+  - name: Filter VMs by folder
+    set_fact:
+      filtered_vms: >-
+        {{
+          vm_info.virtual_machines
+          | selectattr('folder', 'defined')
+          | selectattr('folder', 'in', vmware_folders)
+          | list
+        }}
+
+  # fallback match
+  - name: fallback folder match
+    set_fact:
+      filtered_vms: >-
+        {{
+          vm_info.virtual_machines
+          | selectattr('folder', 'defined')
+          | select('search', vmware_folders | join('|'))
+          | list
+        }}
+    when: filtered_vms | length == 0
+
+  # -----------------------
+  # GROUP BY ROLE (PowerShell logic)
+  # -----------------------
+  - name: Group VMs by role
+    set_fact:
+      app_vms: "{{ filtered_vms | selectattr('guest_name', 'defined') | selectattr('role', 'equalto', 'app') | list }}"
+      db_vms: "{{ filtered_vms | selectattr('role', 'equalto', 'db') | list }}"
+      misc_vms: "{{ filtered_vms | rejectattr('role', 'equalto', 'app') | rejectattr('role', 'equalto', 'db') | list }}"
+
+  # fallback if role field is inconsistent (common in vCenter)
+  - name: safer grouping fallback
+    set_fact:
+      app_vms: "{{ filtered_vms | select('search', 'app') | list }}"
+      db_vms: "{{ filtered_vms | select('search', 'db') | list }}"
+      misc_vms: "{{ filtered_vms | select('search', 'misc') | list }}"
+    when: app_vms is not defined or db_vms is not defined
+
+  # -----------------------
+  # BUILD TABLES
+  # -----------------------
+  - name: Build HTML tables
+    set_fact:
+      app_table: |
+        <h2>APP Servers</h2>
+        <table border="1">
+        <tr><th>Name</th><th>Power</th><th>CPU</th><th>RAM</th></tr>
+        {% for vm in app_vms %}
+        <tr>
+          <td>{{ vm.guest_name }}</td>
+          <td>{{ vm.power_state }}</td>
+          <td>{{ vm.cpu_count }}</td>
+          <td>{{ vm.memory_mb }}</td>
+        </tr>
+        {% endfor %}
+        </table>
+
+      db_table: |
+        <h2>DB Servers</h2>
+        <table border="1">
+        <tr><th>Name</th><th>Power</th><th>CPU</th><th>RAM</th></tr>
+        {% for vm in db_vms %}
+        <tr>
+          <td>{{ vm.guest_name }}</td>
+          <td>{{ vm.power_state }}</td>
+          <td>{{ vm.cpu_count }}</td>
+          <td>{{ vm.memory_mb }}</td>
+        </tr>
+        {% endfor %}
+        </table>
+
+      misc_table: |
+        <h2>MISC Servers</h2>
+        <table border="1">
+        <tr><th>Name</th><th>Power</th><th>CPU</th><th>RAM</th></tr>
+        {% for vm in misc_vms %}
+        <tr>
+          <td>{{ vm.guest_name }}</td>
+          <td>{{ vm.power_state }}</td>
+          <td>{{ vm.cpu_count }}</td>
+          <td>{{ vm.memory_mb }}</td>
+        </tr>
+        {% endfor %}
+        </table>
+
+  # -----------------------
+  # BUILD CONFLUENCE "TABS" (SIMULATED)
+  # -----------------------
+  - name: Build Confluence page with role sections
+    set_fact:
+      final_content: |
+        <ac:structured-macro ac:name="warning">
+          <ac:rich-text-body>
+            <p><b>AUTO-GENERATED VMware INVENTORY</b></p>
+            <p>Grouped by role (APP / DB / MISC)</p>
+          </ac:rich-text-body>
+        </ac:structured-macro>
+
+        <hr/>
+
+        <h1>APP</h1>
+        {{ app_table }}
+
+        <hr/>
+
+        <h1>DB</h1>
+        {{ db_table }}
+
+        <hr/>
+
+        <h1>MISC</h1>
+        {{ misc_table }}
+
+  # -----------------------
+  # CHECK PAGE
+  # -----------------------
+  - name: Check Confluence page
+    uri:
+      url: "{{ confluence_base_url }}/rest/api/content?title={{ confluence_page_title | urlencode }}&spaceKey={{ confluence_space_key }}&expand=version"
+      method: GET
+      user: "{{ confluence_user }}"
+      password: "{{ confluence_password }}"
+      force_basic_auth: yes
+      return_content: yes
+    register: page_lookup
+
+  - name: page exists
+    set_fact:
+      page_exists: "{{ page_lookup.json.results | length > 0 }}"
+
+  # -----------------------
+  # PUSH TO CONFLUENCE
+  # -----------------------
+  - name: Create or update page
+    uri:
+      url: >-
+        {{
+          confluence_base_url +
+          (
+            '/rest/api/content/' + page_lookup.json.results[0].id
+            if page_exists else '/rest/api/content'
+          )
+        }}
+      method: "{{ 'PUT' if page_exists else 'POST' }}"
+      user: "{{ confluence_user }}"
+      password: "{{ confluence_password }}"
+      force_basic_auth: yes
+
+      headers:
+        Content-Type: "application/json"
+
+      body_format: json
+
+      body:
+        id: "{{ page_lookup.json.results[0].id if page_exists else omit }}"
+        type: page
+        title: "{{ confluence_page_title }}"
+        space:
+          key: "{{ confluence_space_key }}"
+        ancestors:
+          - id: "{{ parent_page_id }}"
+        version: >-
+          {{
+            {'number': page_lookup.json.results[0].version.number | int + 1}
+            if page_exists else omit
+          }}
+        body:
+          storage:
+            representation: storage
+            value: "{{ final_content }}"
+
+  # -----------------------
+  # DONE
+  # -----------------------
+  - debug:
+      msg: "VMware role-based Confluence page updated"
