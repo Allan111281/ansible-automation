@@ -15,7 +15,7 @@
     vcenter_user: "{{ lookup('env', 'VCENTER_USER') }}"
     vcenter_password: "{{ lookup('env', 'VCENTER_PASSWORD') }}"
 
-    environment: "{{ lookup('env', 'ENVIRONMENT') }}"   # sandbox/dans/esas/stads
+    vm_environment: "{{ lookup('env', 'ENVIRONMENT') }}"
 
   tasks:
 
@@ -38,8 +38,7 @@
       env_vms: >-
         {{
           vm_info.virtual_machines
-          | selectattr('folder', 'defined')
-          | select('search', environment)
+          | selectattr('folder', 'search', vm_environment)
           | list
         }}
 
