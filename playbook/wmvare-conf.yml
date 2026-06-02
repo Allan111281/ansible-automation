@@ -15,7 +15,6 @@
     vcenter_user: "{{ lookup('env', 'VCENTER_USER') }}"
     vcenter_password: "{{ lookup('env', 'VCENTER_PASSWORD') }}"
 
-    # FIX: safe variable + fallback
     vm_environment: "{{ lookup('env', 'ENVIRONMENT') | default('UNKNOWN') }}"
 
   tasks:
@@ -32,7 +31,7 @@
     register: vm_info
 
   # -----------------------------
-  # FILTER ROOT ENVIRONMENT
+  # FILTER ENVIRONMENT
   # -----------------------------
   - name: Filter by environment root folder
     set_fact:
@@ -44,15 +43,11 @@
         }}
 
   # -----------------------------
-  # EXTRACT SUBFOLDERS
+  # GROUP FOLDERS
   # -----------------------------
   - name: Build folder list
     set_fact:
-      folder_groups: >-
-        {{
-          env_vms
-          | groupby('folder')
-        }}
+      folder_groups: "{{ env_vms | groupby('folder') }}"
 
   # -----------------------------
   # BUILD HTML
@@ -72,15 +67,15 @@
             <th>VM</th>
             <th>Power</th>
             <th>CPU</th>
-            <th>RAM</th>
+            <th>RAM (MB)</th>
           </tr>
 
           {% for vm in group.1 %}
           <tr>
-            <td>{{ vm.guest_name }}</td>
-            <td>{{ vm.power_state }}</td>
-            <td>{{ vm.cpu_count }}</td>
-            <td>{{ vm.memory_mb }}</td>
+            <td>{{ vm.guest_name | default(vm.name) }}</td>
+            <td>{{ vm.power_state | default('unknown') }}</td>
+            <td>{{ vm.num_cpus | default('0') }}</td>
+            <td>{{ vm.memory_mb | default('0') }}</td>
           </tr>
           {% endfor %}
 
