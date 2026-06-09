@@ -39,8 +39,10 @@
       env_vms: >-
         {{
           vm_info.virtual_machines
-          | selectattr('folder', 'search', vm_environment)
-          | list
+          if vm_environment == 'all'
+          else vm_info.virtual_machines
+            | selectattr('folder', 'search', vm_environment)
+            | list
         }}
 
   # -----------------------------
