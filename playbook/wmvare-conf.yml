@@ -28,6 +28,7 @@
       username: "{{ vcenter_user }}"
       password: "{{ vcenter_password }}"
       validate_certs: false
+      show_allocated: true
     register: vm_info
 
   # -----------------------------
@@ -74,8 +75,8 @@
           <tr>
             <td>{{ vm.guest_name | default(vm.name) }}</td>
             <td>{{ vm.power_state | default('unknown') }}</td>
-            <td>{{ vm.num_cpus | default('0') }}</td>
-            <td>{{ vm.memory_mb | default('0') }}</td>
+            <td>{{ vm.allocated.cpu | default('0') }}</td>
+            <td>{{ vm.allocated.memory | default('0') }}</td>
           </tr>
           {% endfor %}
 
