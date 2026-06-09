@@ -23,6 +23,7 @@
   # GET VMS
   # -----------------------------
   - name: Get VM inventory
+    no_log: true
     community.vmware.vmware_vm_info:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_user }}"
@@ -103,6 +104,7 @@
   # CHECK PAGE
   # -----------------------------
   - name: Check page
+    no_log: true
     uri:
       url: "{{ confluence_base_url }}/rest/api/content?title={{ confluence_page_title | urlencode }}&spaceKey={{ confluence_space_key }}&expand=version"
       method: GET
@@ -119,6 +121,7 @@
   # PUSH TO CONFLUENCE
   # -----------------------------
   - name: Push to Confluence
+    no_log: true
     uri:
       url: >-
         {{
