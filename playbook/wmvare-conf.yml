@@ -29,6 +29,7 @@
       password: "{{ vcenter_password }}"
       validate_certs: false
       show_allocated: true
+      show_net: true
     register: vm_info
 
   # -----------------------------
@@ -69,16 +70,28 @@
           <tr>
             <th>VM</th>
             <th>Power</th>
+            <th>OS</th>
             <th>CPU</th>
             <th>RAM (MB)</th>
+            <th>Network</th>
           </tr>
 
           {% for vm in group.1 %}
           <tr>
             <td>{{ vm.guest_name | default(vm.name) }}</td>
             <td>{{ vm.power_state | default('unknown') }}</td>
+            <td>{{ vm.guest_fullname | default('unknown') }}</td>
             <td>{{ vm.allocated.cpu | default('0') }}</td>
             <td>{{ vm.allocated.memory | default('0') }}</td>
+            <td>
+              {% if vm.vm_network %}
+                {% for iface in vm.vm_network.values() %}
+                  {{ iface.ipv4 | join(', ') }}{% if iface.ipv6 %} / {{ iface.ipv6 | join(', ') }}{% endif %}<br/>
+                {% endfor %}
+              {% else %}
+                n/a
+              {% endif %}
+            </td>
           </tr>
           {% endfor %}
 
