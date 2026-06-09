@@ -40,7 +40,7 @@
       env_vms: >-
         {{
           vm_info.virtual_machines
-          if vm_environment == 'all'
+          if vm_environment | default('') | lower | trim == 'all'
           else vm_info.virtual_machines
             | selectattr('folder', 'search', vm_environment)
             | list
